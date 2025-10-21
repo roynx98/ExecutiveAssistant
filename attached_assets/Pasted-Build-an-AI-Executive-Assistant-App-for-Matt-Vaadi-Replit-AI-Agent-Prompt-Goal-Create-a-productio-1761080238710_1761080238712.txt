@@ -1,0 +1,256 @@
+Build an AI Executive Assistant App for Matt Vaadi (Replit AI Agent Prompt)
+Goal
+
+Create a production-ready, full-stack web app that replaces my Executive Assistant by automating daily briefing, email triage and drafting, smart calendar guardrails, CRM nudges, content workflow, SOP search, and gifting triggers. The app runs on Replit with a Node/Express backend, a React frontend, Google OAuth, and scheduled jobs. It integrates with Google Workspace, Zoho CRM, HighLevel (GHL), Trello, LinkedIn, Apollo, Canva, and USPS.
+
+This app must follow my work style and communication rules, including using Google Chat as the preferred channel and protecting my 8 AM to 4 PM Eastern workday with smart scheduling defaults. It should be proactive, not passive, and should create helpful drafts, briefs, and task suggestions automatically. 【8†source】
+
+Tech Stack
+
+Frontend: React (Vite or Next.js running as a Node server if simpler). Tailwind for UI. Simple, clean, fast.
+
+Backend: Node.js + Express.
+
+DB: Supabase Postgres (or Replit DB if needed, but prefer Supabase).
+
+Auth: Google OAuth 2.0 (Gmail, Calendar, Drive, Chat scopes). Token storage in DB with refresh.
+
+LLM: Model switch layer that can call Google Gemini (AI Studio or Vertex), OpenAI, or Anthropic. Default to Gemini for long context and Drive docs. Use ENV flags to choose.
+
+Jobs: node-cron for scheduled tasks. Webhooks for Gmail Watch and Calendar channel watch.
+
+Embeddings and vector search: pgvector on Supabase for SOP and docs search.
+
+Secrets: Replit Secrets for API keys.
+
+High-level Features
+
+Daily Briefing Dashboard
+
+Morning Brief at 7:30 AM ET shows: today calendar, top 10 priority emails, 3 goals, CRM items due, content tasks, top 5 relationships to nudge.
+
+One-click actions: reply, snooze, create task, book time block.
+
+Email Management
+
+Gmail read, classify, label, and draft replies that match my tone. Casual with me and business casual with external contacts. 【8†source】
+
+Approve-and-send flow. Fast templates. Thread summary panel.
+
+Calendar Intelligence
+
+Enforce 8 AM to 4 PM ET rule. Respect buffers, deep work blocks, and meeting windows. Decline or propose alternative times with a friendly template. 【8†source】
+
+Pre-meeting brief pulls CRM, LinkedIn, and past email thread context. Post-meeting recap with next steps.
+
+CRM Nudges
+
+Zoho and GHL integrations. Auto-create potentials on new meetings. Flag stale deals. Friday snapshot of pipeline wins, risks, and next actions.
+
+Content and Engagement
+
+LinkedIn and X queue. 5 daily engagement targets from Sales Navigator lists. Draft posts from newsletter and Loom notes. Track goals (add 300 LinkedIn, add 100 X in 30 days). 【8†source】
+
+SOP and Training Library
+
+Index Loom links and Docs for all recurring tasks and how-to guides. Natural language search across SOPs. Return steps, links, and checklists. 【8†source】
+
+Gifting and Recognition
+
+Scan for birthdays, anniversaries, and new client wins. Auto-generate Canva design from a template and USPS label for shipping. 【8†source】
+
+Google Chat Agent
+
+Send daily brief, push urgent alerts, and accept commands like “summarize thread with Scott and create 3 bullets and a reply.” Use the tone rules above. 【8†source】
+
+Voice and Vibe Capture
+
+Simple voice note input that creates tasks, notes, or messages. Optional daily “vibe check” that can lighten or tighten scheduling.
+
+Required Integrations and Scopes
+
+Google APIs: Gmail, Calendar, Drive, People, Chat. Scopes must support read, draft, send, labels, events, Drive file read, and Chat messages.
+
+Zoho CRM: Contacts, Deals (Potentials), Activities.
+
+HighLevel (GHL): Contacts, Opportunities, Pipelines, Appointments.
+
+Trello: Boards, Lists, Cards.
+
+LinkedIn and X: posting and basic engagement (note: some features will be manual if API limits block automation).
+
+Apollo: enrichment lookups by email or company.
+
+Canva and USPS: template render and label creation.
+
+Placeholders for API keys and secrets. Use environment variables.
+
+Data Model (Supabase)
+
+Tables:
+
+users(id, email, name, timezone, created_at)
+
+oauth_tokens(user_id, provider, access_token, refresh_token, expires_at, scopes)
+
+settings(user_id, workday_start, workday_end, meeting_windows_json, deep_work_blocks_json)
+
+email_rules(user_id, rule_name, matcher_json, actions_json)
+
+tasks(id, user_id, title, status, due_at, source, metadata_json)
+
+contacts(id, user_id, email, name, source, social_json)
+
+pipelines(id, user_id, provider, deal_id, stage, value, next_action_at, notes)
+
+posts(id, user_id, network, status, content, scheduled_for)
+
+sops(id, user_id, title, url, type, embedding)
+
+events_cache(id, user_id, source, external_id, start_at, end_at, metadata_json)
+
+gifts(id, user_id, person, occasion, due_at, status, shipping_label_url)
+
+UI Pages
+
+Home: Morning Brief, Today at a glance, quick actions.
+
+Comms: Gmail triage and drafting. Google Chat quick replies.
+
+Calendar: Guardrail settings, meeting windows, buffers, and block planner.
+
+Sales: CRM pipeline snapshot, stale deals, meeting prep briefs.
+
+Content: Queue, engagement targets, and drafting tools.
+
+SOP Search: Ask a question and get the steps and Loom link.
+
+Gifts: Upcoming birthdays and anniversaries, one-click USPS label.
+
+Settings: Auth connections, tone settings, and daily schedule rules.
+
+Routes and Handlers (Backend)
+
+POST /auth/google/callback: store tokens.
+
+POST /webhooks/gmail: Gmail watch notifications. Fetch threads, classify, label, draft.
+
+POST /webhooks/calendar: Calendar channel watch. Keep cache and conflicts updated.
+
+GET /brief/today: return Brief JSON for the UI and Chat.
+
+POST /email/draft: body includes threadId and purpose, returns draft.
+
+POST /email/send: send approved draft.
+
+POST /calendar/schedule: schedule with guardrails enforced.
+
+GET /crm/snapshot: pipeline view for Zoho + GHL.
+
+POST /sop/search: text to answer with steps and links.
+
+POST /gifts/trigger: scan sources and create shipments.
+
+POST /chat/command: Google Chat slash style commands.
+
+All handlers must validate auth, rate limits, and log actions. Use modular services for providers.
+
+Scheduling and Jobs
+
+Daily Brief at 7:30 AM ET: compute and send to UI and Google Chat.
+
+Weekly Scorecard Monday before 9 AM ET: compile KPIs and email summary. 【8†source】
+
+Newsletter research Monday before 11 AM ET: assemble a draft outline. 【8†source】
+
+Pipeline snapshot Friday 3 PM ET: wins, losses, next steps.
+
+Birthday and anniversary sweep daily at 8 AM ET.
+
+Prompting Standards
+
+Store prompts in versioned files. Include input, tools, and output schema.
+
+Draft emails: follow tone rules. Casual with me. Business casual when replying to my contacts. Avoid fluff. Provide 3 subject lines if new thread.
+
+Meeting briefs: who, context, last 3 emails, CRM stage, 3 goals, 5 talking points, 3 asks.
+
+SOP answers: steps, links, and a simple checklist.
+
+Tone and Work Rules
+
+Preferred channel for quick pings: Google Chat. 【8†source】
+
+Work hours: 8 AM to 4 PM Eastern. Avoid scheduling outside those hours. Protect creative time outside of that window from interruptions. 【8†source】
+
+Be proactive. If the app detects a need, act. Do not wait for instruction. 【8†source】
+
+Acceptance Criteria
+
+Google OAuth flow runs and stores tokens. A test call to Gmail and Calendar works.
+
+Daily Brief endpoint returns real data and renders cleanly in the UI.
+
+Email triage lists recent threads and can generate a draft and send on approval.
+
+Calendar scheduling blocks non-window times and applies buffers.
+
+SOP search returns a useful answer and the correct Loom or Doc link.
+
+CRM snapshot pulls deals from Zoho and GHL and flags stale items.
+
+Google Chat bot sends the Daily Brief and handles at least 3 commands.
+
+Jobs run on schedule and produce artifacts (emails or Chat posts).
+
+Setup Instructions (Agent, please generate code and scripts)
+
+Create React frontend in /app with Tailwind.
+
+Create Express backend in /server.
+
+Add Supabase SDK and migration SQL for data model above.
+
+Add Google OAuth using passport or google-auth-library; request Gmail, Calendar, Drive, Chat scopes.
+
+Implement /brief/today using live Gmail, Calendar, CRM mocks first, then real providers.
+
+Implement Gmail draft with a prompt file and tool wrappers.
+
+Add node-cron jobs for Daily Brief and Weekly Scorecard times above.
+
+Create a minimal Google Chat bot that posts to a space or DM.
+
+Provide a .env.example with all keys and callback URLs.
+
+Provide README with install, run, and test steps.
+
+Notes for the Agent
+
+Keep the UI simple and fast. Prioritize the Morning Brief and Comms.
+
+Abstract provider services so we can swap CRMs or models.
+
+Write unit tests for core helpers (time windows, buffers, email classifiers).
+
+No vendor lock in. The model layer must be pluggable.
+
+Respect privacy. Only store what we need. Do not store raw emails if avoidable. Index with embeddings and IDs.
+
+Stretch Goals (if time allows)
+
+Voice capture that converts a short memo into tasks or replies.
+
+Lightweight mobile view for on-the-go approvals.
+
+Admin page to edit rules for email classification and calendar windows.
+
+Source-of-Truth Cues from Executive Assistant Guide
+
+Preferred channel: Google Chat. 【8†source】
+
+Work hours and calendar rules: 8 AM to 4 PM Eastern, protect creative time. 【8†source】
+
+Proactive support expectation, recurring tasks cadence, growth targets for LinkedIn and X, training and SOP orientation. 【8†source】
+
+Deliver the code scaffolds, env templates, and README. Keep the copy tight and clear. Avoid fluff. No em dashes.
