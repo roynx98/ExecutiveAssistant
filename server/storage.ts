@@ -1,38 +1,114 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { db } from "./db";
+import { 
+  users, tasks, settings, eventsCache, pipelines,
+  type User, type InsertUser,
+  type Task, type InsertTask,
+  type Settings, type InsertSettings,
+  type EventCache, type InsertEvent,
+  type Pipeline, type InsertPipeline,
+} from "@shared/schema";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
+  getUserSettings(userId: string): Promise<Settings | undefined>;
+  upsertUserSettings(settings: InsertSettings): Promise<Settings>;
+  
+  getUserTasks(userId: string): Promise<Task[]>;
+  createTask(task: InsertTask): Promise<Task>;
+  updateTaskStatus(taskId: string, status: string): Promise<void>;
+  
+  getTodayEvents(userId: string): Promise<EventCache[]>;
+  cacheEvents(events: InsertEvent[]): Promise<void>;
+  
+  getActiveDeals(userId: string): Promise<Pipeline[]>;
+  createDeal(deal: InsertPipeline): Promise<Pipeline>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
-  }
-
+export class DbStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async getUserSettings(userId: string): Promise<Settings | undefined> {
+    const [userSettings] = await db.select().from(settings).where(eq(settings.userId, userId));
+    return userSettings;
+  }
+
+  async upsertUserSettings(userSettings: InsertSettings): Promise<Settings> {
+    const existing = await this.getUserSettings(userSettings.userId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(settings)
+        .set({ ...userSettings, updatedAt: new Date() })
+        .where(eq(settings.userId, userSettings.userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(settings).values(userSettings).returning();
+      return created;
+    }
+  }
+
+  async getUserTasks(userId: string): Promise<Task[]> {
+    return db.select().from(tasks).where(eq(tasks.userId, userId)).orderBy(desc(tasks.createdAt));
+  }
+
+  async createTask(task: InsertTask): Promise<Task> {
+    const [newTask] = await db.insert(tasks).values(task).returning();
+    return newTask;
+  }
+
+  async updateTaskStatus(taskId: string, status: string): Promise<void> {
+    await db.update(tasks).set({ status }).where(eq(tasks.id, taskId));
+  }
+
+  async getTodayEvents(userId: string): Promise<EventCache[]> {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    return db
+      .select()
+      .from(eventsCache)
+      .where(
+        and(
+          eq(eventsCache.userId, userId),
+          gte(eventsCache.startAt, startOfDay),
+          lte(eventsCache.startAt, endOfDay)
+        )
+      );
+  }
+
+  async cacheEvents(events: InsertEvent[]): Promise<void> {
+    if (events.length > 0) {
+      await db.insert(eventsCache).values(events).onConflictDoNothing();
+    }
+  }
+
+  async getActiveDeals(userId: string): Promise<Pipeline[]> {
+    return db.select().from(pipelines).where(eq(pipelines.userId, userId)).orderBy(desc(pipelines.updatedAt));
+  }
+
+  async createDeal(deal: InsertPipeline): Promise<Pipeline> {
+    const [newDeal] = await db.insert(pipelines).values(deal).returning();
+    return newDeal;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DbStorage();

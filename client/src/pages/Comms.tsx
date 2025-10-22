@@ -13,59 +13,112 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+interface Email {
+  id: string;
+  sender: string;
+  senderEmail: string;
+  subject: string;
+  preview: string;
+  timestamp: string;
+  labels: string[];
+  priority?: 'high' | 'normal' | 'low';
+  unread: boolean;
+}
 
 export default function Comms() {
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [draftContent, setDraftContent] = useState("");
+  const [tone, setTone] = useState<'casual' | 'business-casual' | 'formal'>('business-casual');
+  const { toast } = useToast();
 
-  const threads = [
-    {
-      id: "1",
-      sender: "Sarah Johnson",
-      senderEmail: "sarah@company.com",
-      subject: "Q4 Strategy Review Meeting",
-      preview: "Hi Matt, I wanted to follow up on our discussion about the Q4 strategy...",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      labels: ["Work", "Important"],
-      priority: "high" as const,
-      unread: true,
+  const { data: emailsData, isLoading, refetch } = useQuery<{ emails: Email[] }>({
+    queryKey: ['/api/emails'],
+  });
+
+  const generateDraftMutation = useMutation({
+    mutationFn: async ({ threadId, context }: { threadId: string; context: string }) => {
+      const response = await fetch('/api/email/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId, tone, context }),
+      });
+      if (!response.ok) throw new Error('Failed to generate draft');
+      return response.json();
     },
-    {
-      id: "2",
-      sender: "Mike Chen",
-      senderEmail: "mike@client.com",
-      subject: "Project Update - Phase 2 Deliverables",
-      preview: "The latest deliverables are ready for review. Let me know when you...",
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-      labels: ["Client"],
-      priority: "high" as const,
-      unread: true,
+    onSuccess: (data: any) => {
+      setDraftContent(data.draft);
+      toast({
+        title: "Draft generated",
+        description: "AI has created a draft reply for you",
+      });
     },
-    {
-      id: "3",
-      sender: "Alex Rodriguez",
-      senderEmail: "alex@partner.com",
-      subject: "Partnership Opportunity",
-      preview: "I hope this email finds you well. I wanted to reach out about a potential...",
-      timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
-      labels: ["Partnership"],
-      priority: "normal" as const,
-      unread: false,
+  });
+
+  const sendEmailMutation = useMutation({
+    mutationFn: async ({ to, subject, body }: { to: string; subject: string; body: string }) => {
+      const response = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, subject, body }),
+      });
+      if (!response.ok) throw new Error('Failed to send email');
+      return response.json();
     },
-  ];
+    onSuccess: () => {
+      setDraftContent("");
+      setSelectedThread(null);
+      toast({
+        title: "Email sent",
+        description: "Your email has been sent successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/emails'] });
+    },
+  });
+
+  const selectedEmail = emailsData?.emails.find(e => e.id === selectedThread);
 
   const handleGenerateDraft = () => {
-    console.log("Generating AI draft for thread:", selectedThread);
-    setDraftContent(
-      "Thanks for reaching out. I've reviewed the materials and have a few thoughts...\n\nLet me know when you're available to discuss further.\n\nBest,\nMatt"
-    );
+    if (selectedEmail) {
+      const context = `From: ${selectedEmail.sender}\nSubject: ${selectedEmail.subject}\n\n${selectedEmail.preview}`;
+      generateDraftMutation.mutate({ threadId: selectedThread!, context });
+    }
   };
+
+  const handleSendEmail = () => {
+    if (selectedEmail && draftContent) {
+      sendEmailMutation.mutate({
+        to: selectedEmail.senderEmail,
+        subject: `Re: ${selectedEmail.subject}`,
+        body: draftContent,
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-semibold">Communications</h1>
+        <p className="text-muted-foreground">Loading emails...</p>
+      </div>
+    );
+  }
+
+  const threads = emailsData?.emails || [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <h1 className="text-3xl font-semibold">Communications</h1>
-        <Button variant="outline" size="sm" data-testid="button-refresh-emails">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          data-testid="button-refresh-emails"
+        >
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -86,13 +139,13 @@ export default function Comms() {
               </div>
               <div className="flex gap-2 flex-wrap">
                 <Badge variant="secondary" className="cursor-pointer hover-elevate">
-                  All
+                  All ({threads.length})
                 </Badge>
                 <Badge variant="outline" className="cursor-pointer hover-elevate">
-                  Unread (8)
+                  Unread ({threads.filter(t => t.unread).length})
                 </Badge>
                 <Badge variant="outline" className="cursor-pointer hover-elevate">
-                  High Priority
+                  High Priority ({threads.filter(t => t.priority === 'high').length})
                 </Badge>
               </div>
             </div>
@@ -102,12 +155,18 @@ export default function Comms() {
               <EmailThread
                 key={thread.id}
                 {...thread}
+                timestamp={new Date(thread.timestamp)}
                 onClick={() => {
                   console.log("Selected thread:", thread.id);
                   setSelectedThread(thread.id);
                 }}
               />
             ))}
+            {threads.length === 0 && (
+              <p className="text-muted-foreground text-center py-8 px-4">
+                No emails found
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -118,12 +177,12 @@ export default function Comms() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col gap-4">
-            {selectedThread ? (
+            {selectedThread && selectedEmail ? (
               <>
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">Tone:</span>
-                    <Select defaultValue="business-casual">
+                    <Select value={tone} onValueChange={(v: any) => setTone(v)}>
                       <SelectTrigger className="w-48" data-testid="select-tone">
                         <SelectValue />
                       </SelectTrigger>
@@ -137,9 +196,10 @@ export default function Comms() {
                       variant="outline"
                       size="sm"
                       onClick={handleGenerateDraft}
+                      disabled={generateDraftMutation.isPending}
                       data-testid="button-generate-draft"
                     >
-                      Generate Draft
+                      {generateDraftMutation.isPending ? 'Generating...' : 'Generate Draft'}
                     </Button>
                   </div>
                   <Textarea
@@ -162,14 +222,18 @@ export default function Comms() {
                     Save Draft
                   </Button>
                   <Button
-                    onClick={() => {
-                      console.log("Email sent:", draftContent);
-                      setDraftContent("");
-                    }}
+                    onClick={handleSendEmail}
+                    disabled={sendEmailMutation.isPending || !draftContent}
                     data-testid="button-send-email"
                   >
-                    <Send className="h-4 w-4 mr-2" />
-                    Send
+                    {sendEmailMutation.isPending ? (
+                      'Sending...'
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Send
+                      </>
+                    )}
                   </Button>
                 </div>
               </>
