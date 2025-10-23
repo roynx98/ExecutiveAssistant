@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { fetchRecentEmails, sendEmail } from "./services/google/gmail";
 import { fetchTodayEvents, isWithinWorkHours } from "./services/google/calendar";
 import { generateEmailDraft } from "./services/llm";
+import { getAuthUrl, getTokensFromCode } from "./services/oauth";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -274,7 +275,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/oauth/authorize", (req, res) => {
     try {
-      const { getAuthUrl } = require('./services/oauth');
       const redirectUri = `${req.protocol}://${req.get('host')}/api/oauth/callback`;
       const authUrl = getAuthUrl(redirectUri);
       res.redirect(authUrl);
@@ -295,7 +295,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Authorization code missing" });
       }
 
-      const { getTokensFromCode } = require('./services/oauth');
       const redirectUri = `${req.protocol}://${req.get('host')}/api/oauth/callback`;
       const tokens = await getTokensFromCode(code, redirectUri);
 
