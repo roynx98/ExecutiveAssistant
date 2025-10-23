@@ -1,11 +1,12 @@
 import { db } from "./db";
 import { 
-  users, tasks, settings, eventsCache, pipelines,
+  users, tasks, settings, eventsCache, pipelines, oauthTokens,
   type User, type InsertUser,
   type Task, type InsertTask,
   type Settings, type InsertSettings,
   type EventCache, type InsertEvent,
   type Pipeline, type InsertPipeline,
+  type OauthToken, type InsertOauthToken,
 } from "@shared/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 
@@ -26,6 +27,8 @@ export interface IStorage {
   
   getActiveDeals(userId: string): Promise<Pipeline[]>;
   createDeal(deal: InsertPipeline): Promise<Pipeline>;
+  
+  saveOAuthToken(token: InsertOauthToken): Promise<OauthToken>;
 }
 
 export class DbStorage implements IStorage {
@@ -108,6 +111,31 @@ export class DbStorage implements IStorage {
   async createDeal(deal: InsertPipeline): Promise<Pipeline> {
     const [newDeal] = await db.insert(pipelines).values(deal).returning();
     return newDeal;
+  }
+
+  async saveOAuthToken(token: InsertOauthToken): Promise<OauthToken> {
+    const existing = await db
+      .select()
+      .from(oauthTokens)
+      .where(
+        and(
+          eq(oauthTokens.userId, token.userId),
+          eq(oauthTokens.provider, token.provider)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(oauthTokens)
+        .set({ ...token, updatedAt: new Date() })
+        .where(eq(oauthTokens.id, existing[0].id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(oauthTokens).values(token).returning();
+      return created;
+    }
   }
 }
 

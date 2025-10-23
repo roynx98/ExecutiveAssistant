@@ -272,6 +272,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/oauth/authorize", (req, res) => {
+    try {
+      const { getAuthUrl } = require('./services/oauth');
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/oauth/callback`;
+      const authUrl = getAuthUrl(redirectUri);
+      res.redirect(authUrl);
+    } catch (error) {
+      console.error("Error generating auth URL:", error);
+      res.status(500).json({ 
+        error: "Failed to generate authorization URL",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get("/api/oauth/callback", async (req, res) => {
+    try {
+      const { code } = req.query;
+      
+      if (!code || typeof code !== 'string') {
+        return res.status(400).json({ error: "Authorization code missing" });
+      }
+
+      const { getTokensFromCode } = require('./services/oauth');
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/oauth/callback`;
+      const tokens = await getTokensFromCode(code, redirectUri);
+
+      let user = await storage.getUserByEmail("matt@example.com");
+      if (!user) {
+        user = await storage.createUser({
+          email: "matt@example.com",
+          name: "Matt Vaadi",
+          timezone: "America/New_York",
+        });
+      }
+
+      await storage.saveOAuthToken({
+        userId: user.id,
+        provider: 'google',
+        accessToken: tokens.access_token!,
+        refreshToken: tokens.refresh_token!,
+        expiresAt: new Date(Date.now() + (tokens.expiry_date || 3600000)),
+        scope: tokens.scope || '',
+      });
+
+      res.send(`
+        <html>
+          <head>
+            <title>Authorization Successful</title>
+            <style>
+              body { font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: white; }
+              .container { text-align: center; max-width: 500px; padding: 2rem; }
+              h1 { color: #60a5fa; margin-bottom: 1rem; }
+              p { color: #94a3b8; line-height: 1.6; }
+              button { margin-top: 2rem; padding: 0.75rem 2rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-size: 1rem; }
+              button:hover { background: #2563eb; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>✓ Gmail Connected Successfully!</h1>
+              <p>Your Gmail account has been authorized with full API access. You can now close this window and return to the app.</p>
+              <button onclick="window.close()">Close Window</button>
+            </div>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("Error in OAuth callback:", error);
+      res.status(500).send(`
+        <html>
+          <head>
+            <title>Authorization Failed</title>
+            <style>
+              body { font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: white; }
+              .container { text-align: center; max-width: 500px; padding: 2rem; }
+              h1 { color: #ef4444; margin-bottom: 1rem; }
+              p { color: #94a3b8; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>✗ Authorization Failed</h1>
+              <p>${error instanceof Error ? error.message : 'Unknown error occurred'}</p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
