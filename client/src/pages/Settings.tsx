@@ -27,9 +27,11 @@ export default function Settings() {
   const { toast } = useToast();
   const [selectedBoardId, setSelectedBoardId] = useState<string>("");
   
-  const { data: boards } = useQuery<TrelloBoard[]>({
+  const { data: boardsData } = useQuery<{ boards: TrelloBoard[] }>({
     queryKey: ['/api/trello/boards'],
   });
+  
+  const boards = boardsData?.boards;
 
   const { data: settings } = useQuery<Settings>({
     queryKey: ['/api/settings'],
