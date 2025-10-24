@@ -3,13 +3,19 @@ import { CalendarEvent } from "@/components/CalendarEvent";
 import { EmailThread } from "@/components/EmailThread";
 import { TaskItem } from "@/components/TaskItem";
 import { DealCard } from "@/components/DealCard";
-import { Calendar, Mail, CheckCircle, TrendingUp } from "lucide-react";
+import { Calendar, Mail, CheckCircle, TrendingUp, Plus, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface BriefData {
   date: string;
@@ -59,8 +65,14 @@ interface BriefData {
 }
 
 export default function Home() {
-  const { data: brief, isLoading } = useQuery<BriefData>({
-    queryKey: ['/api/brief/today'],
+  const { toast } = useToast();
+  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [newTaskDue, setNewTaskDue] = useState("");
+
+  const { data: brief, isLoading, refetch } = useQuery<BriefData>({
+    queryKey: ['/api/brief/today?sync=true'],
   });
 
   const updateTaskMutation = useMutation({
@@ -75,11 +87,74 @@ export default function Home() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/brief/today'] });
+      toast({
+        title: "Task updated",
+        description: "Task status has been updated successfully.",
+      });
+    },
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: { name: string; desc?: string; due?: string }) => {
+      const response = await fetch('/api/trello/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData),
+      });
+      if (!response.ok) throw new Error('Failed to create task');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/brief/today'] });
+      setIsAddTaskOpen(false);
+      setNewTaskTitle("");
+      setNewTaskDescription("");
+      setNewTaskDue("");
+      toast({
+        title: "Task created",
+        description: "New task has been added to Trello and synced.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create task",
+      });
     },
   });
 
   const handleToggleTask = (id: string, completed: boolean) => {
     updateTaskMutation.mutate({ id, status: completed ? 'completed' : 'pending' });
+  };
+
+  const handleCreateTask = () => {
+    if (!newTaskTitle.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Task title is required",
+      });
+      return;
+    }
+
+    createTaskMutation.mutate({
+      name: newTaskTitle,
+      desc: newTaskDescription || undefined,
+      due: newTaskDue || undefined,
+    });
+  };
+
+  const handleSyncTrello = async () => {
+    toast({
+      title: "Syncing with Trello",
+      description: "Fetching latest tasks from Trello...",
+    });
+    await refetch();
+    toast({
+      title: "Sync complete",
+      description: "Tasks have been synchronized with Trello.",
+    });
   };
 
   if (isLoading || !brief) {
@@ -171,12 +246,91 @@ export default function Home() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
-            <CardTitle className="text-xl font-semibold">
-              Top Priority Tasks
-            </CardTitle>
-            <Button variant="outline" size="sm" data-testid="button-add-task">
-              Add Task
-            </Button>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-xl font-semibold">
+                Top Priority Tasks
+              </CardTitle>
+              {brief.tasks.some(t => t.source === 'trello') && (
+                <Badge variant="secondary" className="text-xs">
+                  Synced with Trello
+                </Badge>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleSyncTrello}
+                data-testid="button-sync-trello"
+                title="Sync with Trello"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Dialog open={isAddTaskOpen} onOpenChange={setIsAddTaskOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-add-task">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Task
+                  </Button>
+                </DialogTrigger>
+                <DialogContent data-testid="dialog-add-task">
+                  <DialogHeader>
+                    <DialogTitle>Create New Task</DialogTitle>
+                    <DialogDescription>
+                      Create a new task in Trello. It will be synced automatically.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="task-title">Title</Label>
+                      <Input
+                        id="task-title"
+                        placeholder="Enter task title"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        data-testid="input-task-title"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="task-description">Description (optional)</Label>
+                      <Textarea
+                        id="task-description"
+                        placeholder="Enter task description"
+                        value={newTaskDescription}
+                        onChange={(e) => setNewTaskDescription(e.target.value)}
+                        data-testid="input-task-description"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="task-due">Due Date (optional)</Label>
+                      <Input
+                        id="task-due"
+                        type="datetime-local"
+                        value={newTaskDue}
+                        onChange={(e) => setNewTaskDue(e.target.value)}
+                        data-testid="input-task-due"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsAddTaskOpen(false)}
+                      data-testid="button-cancel-task"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleCreateTask}
+                      disabled={createTaskMutation.isPending}
+                      data-testid="button-create-task"
+                    >
+                      {createTaskMutation.isPending ? "Creating..." : "Create Task"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardHeader>
           <CardContent>
             {brief.tasks.length > 0 ? (

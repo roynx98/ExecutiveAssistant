@@ -5,6 +5,16 @@ import { fetchRecentEmails, sendEmail } from "./services/google/gmail";
 import { fetchTodayEvents, isWithinWorkHours } from "./services/google/calendar";
 import { generateEmailDraft } from "./services/llm";
 import { getAuthUrl, getTokensFromCode } from "./services/oauth";
+import {
+  fetchTrelloBoards,
+  fetchTrelloCards,
+  createTrelloCard,
+  updateTrelloCard,
+  deleteTrelloCard,
+  trelloCardToTask,
+  getDefaultListId,
+  fetchBoardLists,
+} from "./services/trello";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -262,12 +272,241 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const syncWithTrello = req.query.sync === 'true';
+      
+      if (syncWithTrello) {
+        try {
+          const trelloCards = await fetchTrelloCards();
+          
+          for (const card of trelloCards) {
+            const trelloTask = trelloCardToTask(card);
+            const trelloId = (trelloTask.metadataJson as any)?.trelloId;
+            
+            const existingTasks = await storage.getUserTasks(user.id);
+            const existing = existingTasks.find(t => 
+              (t.metadataJson as any)?.trelloId === trelloId
+            );
+            
+            if (!existing) {
+              await storage.createTask({
+                ...trelloTask,
+                userId: user.id,
+              });
+            }
+          }
+        } catch (trelloError) {
+          console.warn("Failed to sync with Trello:", trelloError);
+        }
+      }
+
       const tasks = await storage.getUserTasks(user.id);
       res.json({ tasks });
     } catch (error) {
       console.error("Error fetching tasks:", error);
       res.status(500).json({ 
         error: "Failed to fetch tasks",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get("/api/trello/boards", async (req, res) => {
+    try {
+      const boards = await fetchTrelloBoards();
+      res.json({ boards });
+    } catch (error) {
+      console.error("Error fetching Trello boards:", error);
+      res.status(500).json({ 
+        error: "Failed to fetch Trello boards",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get("/api/trello/boards/:boardId/lists", async (req, res) => {
+    try {
+      const { boardId } = req.params;
+      const lists = await fetchBoardLists(boardId);
+      res.json({ lists });
+    } catch (error) {
+      console.error("Error fetching Trello lists:", error);
+      res.status(500).json({ 
+        error: "Failed to fetch Trello lists",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.post("/api/trello/cards", async (req, res) => {
+    try {
+      const schema = z.object({
+        listId: z.string().optional(),
+        boardId: z.string().optional(),
+        name: z.string(),
+        desc: z.string().optional(),
+        due: z.string().optional(),
+      });
+
+      const { listId, boardId, name, desc, due } = schema.parse(req.body);
+      
+      const targetListId = listId || await getDefaultListId(boardId);
+
+      const card = await createTrelloCard({
+        listId: targetListId,
+        name,
+        desc,
+        due,
+      });
+
+      let user = await storage.getUserByEmail("matt@example.com");
+      if (!user) {
+        user = await storage.createUser({
+          email: "matt@example.com",
+          name: "Matt Vaadi",
+          timezone: "America/New_York",
+        });
+      }
+
+      const task = await storage.createTask({
+        ...trelloCardToTask(card),
+        userId: user.id,
+      });
+
+      res.json({ card, task });
+    } catch (error) {
+      console.error("Error creating Trello card:", error);
+      res.status(500).json({ 
+        error: "Failed to create Trello card",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.patch("/api/trello/cards/:cardId", async (req, res) => {
+    try {
+      const { cardId } = req.params;
+      const schema = z.object({
+        name: z.string().optional(),
+        desc: z.string().optional(),
+        due: z.string().optional(),
+        dueComplete: z.boolean().optional(),
+        idList: z.string().optional(),
+      });
+
+      const updates = schema.parse(req.body);
+      const card = await updateTrelloCard(cardId, updates);
+
+      const task = await storage.getTaskById(cardId);
+      if (task) {
+        await storage.updateTask(cardId, {
+          title: card.name,
+          dueAt: card.due ? new Date(card.due) : null,
+          status: card.dueComplete ? 'completed' : 'pending',
+          metadataJson: {
+            ...(typeof task.metadataJson === 'object' ? task.metadataJson : {}),
+            description: card.desc || '',
+            listId: card.idList,
+          },
+        });
+      }
+
+      res.json({ card });
+    } catch (error) {
+      console.error("Error updating Trello card:", error);
+      res.status(500).json({ 
+        error: "Failed to update Trello card",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.post("/api/tasks/from-email", async (req, res) => {
+    try {
+      const schema = z.object({
+        emailId: z.string(),
+        subject: z.string(),
+        content: z.string().optional(),
+      });
+
+      const { emailId, subject, content } = schema.parse(req.body);
+
+      const taskTitle = `Follow up: ${subject}`;
+      const taskDescription = content ? `Email ID: ${emailId}\n\n${content.slice(0, 500)}` : `Email ID: ${emailId}`;
+
+      const card = await createTrelloCard({
+        listId: await getDefaultListId(),
+        name: taskTitle,
+        desc: taskDescription,
+      });
+
+      let user = await storage.getUserByEmail("matt@example.com");
+      if (!user) {
+        user = await storage.createUser({
+          email: "matt@example.com",
+          name: "Matt Vaadi",
+          timezone: "America/New_York",
+        });
+      }
+
+      const task = await storage.createTask({
+        ...trelloCardToTask(card),
+        userId: user.id,
+      });
+
+      res.json({ task, card });
+    } catch (error) {
+      console.error("Error creating task from email:", error);
+      res.status(500).json({ 
+        error: "Failed to create task from email",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.post("/api/tasks/from-event", async (req, res) => {
+    try {
+      const schema = z.object({
+        eventId: z.string(),
+        eventTitle: z.string(),
+        startTime: z.string(),
+        attendees: z.array(z.string()).optional(),
+      });
+
+      const { eventId, eventTitle, startTime, attendees } = schema.parse(req.body);
+
+      const taskTitle = `Prepare for: ${eventTitle}`;
+      const taskDescription = attendees && attendees.length > 0
+        ? `Meeting with: ${attendees.join(', ')}\nEvent ID: ${eventId}`
+        : `Event ID: ${eventId}`;
+
+      const dueDate = new Date(new Date(startTime).getTime() - 24 * 60 * 60 * 1000);
+
+      const card = await createTrelloCard({
+        listId: await getDefaultListId(),
+        name: taskTitle,
+        desc: taskDescription,
+        due: dueDate.toISOString(),
+      });
+
+      let user = await storage.getUserByEmail("matt@example.com");
+      if (!user) {
+        user = await storage.createUser({
+          email: "matt@example.com",
+          name: "Matt Vaadi",
+          timezone: "America/New_York",
+        });
+      }
+
+      const task = await storage.createTask({
+        ...trelloCardToTask(card),
+        userId: user.id,
+      });
+
+      res.json({ task, card });
+    } catch (error) {
+      console.error("Error creating task from event:", error);
+      res.status(500).json({ 
+        error: "Failed to create task from event",
         message: error instanceof Error ? error.message : 'Unknown error'
       });
     }
@@ -313,7 +552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         accessToken: tokens.access_token!,
         refreshToken: tokens.refresh_token!,
         expiresAt: new Date(Date.now() + (tokens.expiry_date || 3600000)),
-        scope: tokens.scope || '',
+        scopes: tokens.scope || '',
       });
 
       res.send(`

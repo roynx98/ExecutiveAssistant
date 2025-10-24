@@ -19,8 +19,11 @@ export interface IStorage {
   upsertUserSettings(settings: InsertSettings): Promise<Settings>;
   
   getUserTasks(userId: string): Promise<Task[]>;
+  getTaskById(taskId: string): Promise<Task | undefined>;
   createTask(task: InsertTask): Promise<Task>;
+  updateTask(taskId: string, updates: Partial<InsertTask>): Promise<Task>;
   updateTaskStatus(taskId: string, status: string): Promise<void>;
+  deleteTask(taskId: string): Promise<void>;
   
   getTodayEvents(userId: string): Promise<EventCache[]>;
   cacheEvents(events: InsertEvent[]): Promise<void>;
@@ -72,13 +75,31 @@ export class DbStorage implements IStorage {
     return db.select().from(tasks).where(eq(tasks.userId, userId)).orderBy(desc(tasks.createdAt));
   }
 
+  async getTaskById(taskId: string): Promise<Task | undefined> {
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
+    return task;
+  }
+
   async createTask(task: InsertTask): Promise<Task> {
     const [newTask] = await db.insert(tasks).values(task).returning();
     return newTask;
   }
 
+  async updateTask(taskId: string, updates: Partial<InsertTask>): Promise<Task> {
+    const [updated] = await db
+      .update(tasks)
+      .set(updates)
+      .where(eq(tasks.id, taskId))
+      .returning();
+    return updated;
+  }
+
   async updateTaskStatus(taskId: string, status: string): Promise<void> {
     await db.update(tasks).set({ status }).where(eq(tasks.id, taskId));
+  }
+
+  async deleteTask(taskId: string): Promise<void> {
+    await db.delete(tasks).where(eq(tasks.id, taskId));
   }
 
   async getTodayEvents(userId: string): Promise<EventCache[]> {
@@ -128,7 +149,7 @@ export class DbStorage implements IStorage {
     if (existing.length > 0) {
       const [updated] = await db
         .update(oauthTokens)
-        .set({ ...token, updatedAt: new Date() })
+        .set(token)
         .where(eq(oauthTokens.id, existing[0].id))
         .returning();
       return updated;

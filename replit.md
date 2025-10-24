@@ -7,7 +7,7 @@ AI-powered executive assistant for Matt Vaadi that automates daily briefings, em
 - **Frontend**: React + Vite, Tailwind CSS, shadcn/ui, TanStack Query
 - **Backend**: Node.js, Express, TypeScript
 - **Database**: PostgreSQL (Neon) with Drizzle ORM
-- **Integrations**: Gmail, Google Calendar, Google Drive (via Replit connectors)
+- **Integrations**: Gmail, Google Calendar, Google Drive, Trello
 - **LLM**: Gemini (default), OpenAI, Anthropic (pluggable)
 - **Scheduling**: node-cron
 
@@ -59,35 +59,58 @@ Pluggable architecture supporting:
 - Weekly scorecard: Monday 9 AM ET
 - Pipeline snapshot: Friday 3 PM ET
 
-## Google Integrations
+## Integrations
 
-### Gmail Connector
-- Connection ID: `conn_google-mail_01K84925K17RK5VVMC4A1NFSYY`
+### Gmail (Custom OAuth)
 - Service: `server/services/google/gmail.ts`
+- OAuth: `server/services/oauth.ts`
 - Functions: `fetchRecentEmails()`, `sendEmail()`
-- Scopes: read, labels, send, metadata
+- Scopes: gmail.readonly, gmail.send, gmail.modify, gmail.labels
+- Implementation: Custom OAuth flow with tokens stored in database
 
-### Calendar Connector
-- Connection ID: `conn_google-calendar_01K849660T3PYX9HRW84FZB2ET`
+### Calendar (Custom OAuth)
 - Service: `server/services/google/calendar.ts`
 - Functions: `fetchTodayEvents()`, `isWithinWorkHours()`
 - Scopes: events (read/write), calendar access
+- Work Hours: 8 AM-4 PM ET enforcement
 
-### Drive Connector
+### Drive (Custom OAuth)
 - Connection ID: `conn_google-drive_01K84975E8CY672F0A4GMECK73`
 - Not yet implemented (planned for SOP search)
 
+### Trello
+- Service: `server/services/trello.ts`
+- Authentication: API Key + Token (token-based, no OAuth)
+- Functions:
+  - `fetchTrelloBoards()` - Get all user boards
+  - `fetchTrelloCards()` - Get cards from boards
+  - `createTrelloCard()` - Create new cards
+  - `updateTrelloCard()` - Update card status/details
+  - `trelloCardToTask()` - Convert Trello cards to app tasks
+- Sync: Bidirectional sync between Trello cards and database tasks
+- Smart Features:
+  - Auto-create tasks from emails (`/api/tasks/from-email`)
+  - Auto-create tasks from calendar events (`/api/tasks/from-event`)
+
 ## API Routes (`server/routes.ts`)
-- `GET /api/brief/today` - Daily briefing data
+- `GET /api/brief/today?sync=true` - Daily briefing with Trello sync
 - `GET /api/emails` - Recent emails with priority filtering
 - `POST /api/email/draft` - Generate AI draft reply
 - `POST /api/email/send` - Send email via Gmail
 - `GET /api/calendar/today` - Today's calendar events
-- `GET /api/tasks` - User tasks
+- `GET /api/tasks?sync=true` - User tasks with optional Trello sync
 - `POST /api/tasks` - Create new task
 - `PATCH /api/tasks/:id` - Update task status
 - `GET /api/settings` - User settings
 - `POST /api/settings` - Update settings
+- `GET /api/trello/boards` - Get all Trello boards
+- `GET /api/trello/boards/:boardId/lists` - Get lists for a board
+- `POST /api/trello/cards` - Create Trello card and sync as task
+- `PATCH /api/trello/cards/:cardId` - Update Trello card
+- `POST /api/tasks/from-email` - Create task from email
+- `POST /api/tasks/from-event` - Create task from calendar event
+- `GET /api/oauth/authorize` - Google OAuth flow
+- `GET /api/oauth/callback` - Google OAuth callback
 
 ## Frontend Pages
 - **Home** (`/`): Morning brief dashboard with metrics, emails, events, tasks, deals
@@ -109,15 +132,21 @@ Pluggable architecture supporting:
 
 ## Recent Changes (Latest Session)
 1. Set up complete database schema with all tables
-2. Implemented Google OAuth integration using Replit connectors
+2. Implemented custom Google OAuth integration (replaced Replit connectors for full API access)
 3. Built pluggable LLM service layer (Gemini, OpenAI, Anthropic)
-4. Created Gmail service for email fetching and AI draft generation
+4. Created Gmail service with full API scopes for email management
 5. Implemented calendar service with work hours enforcement
 6. Built daily briefing endpoint aggregating all data sources
 7. Set up node-cron scheduled jobs for automated workflows
 8. Connected frontend to backend with React Query
 9. Removed all mock data and implemented real data fetching
-10. Added proper loading states and error handling
+10. **Integrated Trello for task management** (Current Session):
+    - Implemented Trello REST API service layer
+    - Added bidirectional sync between Trello cards and database tasks
+    - Created smart task creation from emails and calendar events
+    - Built task creation dialog in Home.tsx with Trello sync button
+    - Auto-sync Trello cards on page load and manual refresh
+    - Extended storage interface for advanced task CRUD operations
 
 ## Known Limitations
 - Google Chat bot not yet implemented
@@ -126,6 +155,8 @@ Pluggable architecture supporting:
 - SOP search needs pgvector embeddings
 - Gifting automation (Canva, USPS) not implemented
 - LinkedIn/X content workflow pending
+- Trello sync is one-way (Trello → Database); updates in app don't push back to Trello yet
+- Perfect Week Template (calendar guardrails) not enforced yet
 
 ## Next Steps
 - Implement Google Chat bot for notifications and commands
@@ -138,8 +169,9 @@ Pluggable architecture supporting:
 ## Environment Requirements
 - Node.js 20+
 - PostgreSQL database (provided by Replit)
-- Google OAuth connectors (Gmail, Calendar, Drive)
-- API keys: GEMINI_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY
+- Google OAuth credentials (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET)
+- Trello API credentials (TRELLO_API_KEY, TRELLO_TOKEN)
+- LLM API keys: GEMINI_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY
 - SESSION_SECRET for Express sessions
 
 ## Development Commands
