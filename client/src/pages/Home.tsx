@@ -105,7 +105,7 @@ export default function Home() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/brief/today'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/brief/today?sync=true'] });
       setIsAddTaskOpen(false);
       setNewTaskTitle("");
       setNewTaskDescription("");

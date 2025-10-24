@@ -19,6 +19,7 @@ interface TrelloBoard {
   name: string;
   desc: string;
   url: string;
+  closed?: boolean;
 }
 
 interface TrelloList {
@@ -52,7 +53,10 @@ export async function fetchTrelloBoards(): Promise<TrelloBoard[]> {
     throw new Error(`Trello API error: ${response.statusText}`);
   }
 
-  return response.json();
+  const boards: TrelloBoard[] = await response.json();
+  
+  // Filter out closed/archived boards to prevent errors when creating cards
+  return boards.filter(board => !board.closed);
 }
 
 export async function fetchBoardLists(boardId: string): Promise<TrelloList[]> {
@@ -131,10 +135,21 @@ export async function createTrelloCard(params: {
   }
 
   const url = `${TRELLO_API_BASE}/cards?${searchParams.toString()}`;
+  console.log('[DEBUG] Trello API Request URL:', url.replace(/key=[^&]+/, 'key=REDACTED').replace(/token=[^&]+/, 'token=REDACTED'));
+  console.log('[DEBUG] Trello API Request params:', {
+    idList: params.listId,
+    name: params.name,
+    desc: params.desc,
+    due: params.due,
+  });
+  
   const response = await fetch(url, { method: 'POST' });
 
   if (!response.ok) {
-    throw new Error(`Trello API error: ${response.statusText}`);
+    const errorBody = await response.text();
+    console.log('[DEBUG] Trello API Error Status:', response.status);
+    console.log('[DEBUG] Trello API Error Body:', errorBody);
+    throw new Error(`Trello API error: ${response.statusText} - ${errorBody}`);
   }
 
   return response.json();

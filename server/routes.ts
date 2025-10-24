@@ -407,9 +407,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getUserSettings(user.id);
       const targetListId = settings?.trelloListId;
 
+      console.log('[DEBUG] Settings:', settings);
+      console.log('[DEBUG] Target List ID:', targetListId);
+
       if (!targetListId) {
         throw new Error('No Trello list configured. Please select a board and list in Settings.');
       }
+
+      console.log('[DEBUG] Creating Trello card with listId:', targetListId, 'name:', name);
 
       const card = await createTrelloCard({
         listId: targetListId,
@@ -431,8 +436,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ card, task });
     } catch (error) {
       console.error("Error creating Trello card:", error);
+      
+      // Provide more helpful error messages
+      let userMessage = "Failed to create Trello card";
+      if (error instanceof Error) {
+        if (error.message.includes('Closed boards cannot be edited')) {
+          userMessage = "Cannot create task: The selected Trello board is closed/archived. Please select a different board in Settings.";
+        } else if (error.message.includes('No Trello list configured')) {
+          userMessage = "Please configure a Trello board and list in Settings before creating tasks.";
+        }
+      }
+      
       res.status(500).json({ 
-        error: "Failed to create Trello card",
+        error: userMessage,
         message: error instanceof Error ? error.message : 'Unknown error'
       });
     }
