@@ -66,10 +66,14 @@ export async function fetchBoardLists(boardId: string): Promise<TrelloList[]> {
   return response.json();
 }
 
-export async function fetchTrelloCards(boardId?: string): Promise<TrelloCard[]> {
+export async function fetchTrelloCards(boardId?: string, listId?: string): Promise<TrelloCard[]> {
   let url: string;
   
-  if (boardId) {
+  if (listId) {
+    // Fetch cards from a specific list
+    url = buildAuthUrl(`/lists/${listId}/cards`);
+  } else if (boardId) {
+    // Fetch cards from a specific board
     url = buildAuthUrl(`/boards/${boardId}/cards`);
   } else {
     // Get all cards from all boards

@@ -17,21 +17,35 @@ interface TrelloBoard {
   url: string;
 }
 
+interface TrelloList {
+  id: string;
+  name: string;
+}
+
 interface Settings {
   workdayStart: string;
   workdayEnd: string;
   trelloBoardId: string | null;
+  trelloListId: string | null;
 }
 
 export default function Settings() {
   const { toast } = useToast();
   const [selectedBoardId, setSelectedBoardId] = useState<string>("");
+  const [selectedListId, setSelectedListId] = useState<string>("");
   
   const { data: boardsData } = useQuery<{ boards: TrelloBoard[] }>({
     queryKey: ['/api/trello/boards'],
   });
   
   const boards = boardsData?.boards;
+
+  const { data: listsData, refetch: refetchLists } = useQuery<{ lists: TrelloList[] }>({
+    queryKey: ['/api/trello/boards', selectedBoardId, 'lists'],
+    enabled: !!selectedBoardId,
+  });
+
+  const lists = listsData?.lists;
 
   const { data: settings } = useQuery<Settings>({
     queryKey: ['/api/settings'],
@@ -41,17 +55,26 @@ export default function Settings() {
     if (settings?.trelloBoardId) {
       setSelectedBoardId(settings.trelloBoardId);
     }
+    if (settings?.trelloListId) {
+      setSelectedListId(settings.trelloListId);
+    }
   }, [settings]);
 
+  useEffect(() => {
+    if (selectedBoardId) {
+      refetchLists();
+    }
+  }, [selectedBoardId, refetchLists]);
+
   const updateSettingsMutation = useMutation({
-    mutationFn: async (data: { trelloBoardId: string }) => {
+    mutationFn: async (data: { trelloBoardId: string; trelloListId: string }) => {
       return apiRequest('POST', '/api/settings', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/settings'] });
       toast({
         title: "Settings updated",
-        description: "Your Trello board selection has been saved.",
+        description: "Your Trello board and list selection has been saved.",
       });
     },
     onError: () => {
@@ -64,8 +87,11 @@ export default function Settings() {
   });
 
   const handleSaveTrelloBoard = () => {
-    if (selectedBoardId) {
-      updateSettingsMutation.mutate({ trelloBoardId: selectedBoardId });
+    if (selectedBoardId && selectedListId) {
+      updateSettingsMutation.mutate({ 
+        trelloBoardId: selectedBoardId,
+        trelloListId: selectedListId
+      });
     }
   };
 
@@ -229,13 +255,35 @@ export default function Settings() {
               </SelectContent>
             </Select>
           </div>
+
+          {selectedBoardId && (
+            <div className="space-y-2">
+              <Label htmlFor="trello-list">Active List</Label>
+              <p className="text-sm text-muted-foreground">
+                Choose which list within the board to sync tasks from
+              </p>
+              <Select value={selectedListId} onValueChange={setSelectedListId}>
+                <SelectTrigger className="max-w-md" data-testid="select-trello-list">
+                  <SelectValue placeholder="Select a list..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {lists?.map((list) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      {list.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="pt-2">
             <Button 
               onClick={handleSaveTrelloBoard}
-              disabled={!selectedBoardId || updateSettingsMutation.isPending}
-              data-testid="button-save-trello-board"
+              disabled={!selectedBoardId || !selectedListId || updateSettingsMutation.isPending}
+              data-testid="button-save-trello-selection"
             >
-              {updateSettingsMutation.isPending ? "Saving..." : "Save Board Selection"}
+              {updateSettingsMutation.isPending ? "Saving..." : "Save Trello Selection"}
             </Button>
           </div>
         </CardContent>

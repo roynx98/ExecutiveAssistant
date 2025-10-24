@@ -30,6 +30,7 @@ export const settings = pgTable("settings", {
   meetingWindowsJson: jsonb("meeting_windows_json").default(sql`'[]'::jsonb`),
   deepWorkBlocksJson: jsonb("deep_work_blocks_json").default(sql`'[]'::jsonb`),
   trelloBoardId: text("trello_board_id"),
+  trelloListId: text("trello_list_id"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

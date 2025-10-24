@@ -35,10 +35,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (syncWithTrello) {
         try {
           const settings = await storage.getUserSettings(user.id);
-          const boardId = settings?.trelloBoardId;
+          const boardId = settings?.trelloBoardId || undefined;
+          const listId = settings?.trelloListId || undefined;
           
-          if (boardId) {
-            const trelloCards = await fetchTrelloCards(boardId);
+          if (listId) {
+            const trelloCards = await fetchTrelloCards(boardId, listId);
             
             for (const card of trelloCards) {
               const trelloTask = trelloCardToTask(card);
@@ -206,6 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         meetingWindowsJson: z.any().optional(),
         deepWorkBlocksJson: z.any().optional(),
         trelloBoardId: z.string().optional(),
+        trelloListId: z.string().optional(),
       });
 
       const updates = schema.parse(req.body);
@@ -313,10 +315,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (syncWithTrello) {
         try {
           const settings = await storage.getUserSettings(user.id);
-          const boardId = settings?.trelloBoardId;
+          const boardId = settings?.trelloBoardId || undefined;
+          const listId = settings?.trelloListId || undefined;
           
-          if (boardId) {
-            const trelloCards = await fetchTrelloCards(boardId);
+          if (listId) {
+            const trelloCards = await fetchTrelloCards(boardId, listId);
             
             for (const card of trelloCards) {
               const trelloTask = trelloCardToTask(card);
@@ -385,24 +388,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/trello/cards", async (req, res) => {
     try {
       const schema = z.object({
-        listId: z.string().optional(),
-        boardId: z.string().optional(),
         name: z.string(),
         desc: z.string().optional(),
         due: z.string().optional(),
       });
 
-      const { listId, boardId, name, desc, due } = schema.parse(req.body);
+      const { name, desc, due } = schema.parse(req.body);
       
-      const targetListId = listId || await getDefaultListId(boardId);
-
-      const card = await createTrelloCard({
-        listId: targetListId,
-        name,
-        desc,
-        due,
-      });
-
       let user = await storage.getUserByEmail("matt@example.com");
       if (!user) {
         user = await storage.createUser({
@@ -411,6 +403,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           timezone: "America/New_York",
         });
       }
+
+      const settings = await storage.getUserSettings(user.id);
+      const targetListId = settings?.trelloListId;
+
+      if (!targetListId) {
+        throw new Error('No Trello list configured. Please select a board and list in Settings.');
+      }
+
+      const card = await createTrelloCard({
+        listId: targetListId,
+        name,
+        desc,
+        due,
+      });
 
       const trelloTask = trelloCardToTask(card);
       const task = await storage.createTask({
