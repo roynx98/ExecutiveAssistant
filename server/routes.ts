@@ -31,6 +31,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const syncWithTrello = req.query.sync === 'true';
+      if (syncWithTrello) {
+        try {
+          const settings = await storage.getUserSettings(user.id);
+          const boardId = settings?.trelloBoardId;
+          
+          if (boardId) {
+            const trelloCards = await fetchTrelloCards(boardId);
+            
+            for (const card of trelloCards) {
+              const trelloTask = trelloCardToTask(card);
+              const trelloId = (trelloTask.metadataJson as any)?.trelloId;
+              
+              const existingTasks = await storage.getUserTasks(user.id);
+              const existing = existingTasks.find(t => 
+                (t.metadataJson as any)?.trelloId === trelloId
+              );
+              
+              if (!existing) {
+                await storage.createTask({
+                  ...trelloTask,
+                  userId: user.id,
+                });
+              }
+            }
+          }
+        } catch (trelloError) {
+          console.warn("Failed to sync with Trello:", trelloError);
+        }
+      }
+
       const [emails, events, tasks, deals] = await Promise.all([
         fetchRecentEmails(10).catch(() => []),
         fetchTodayEvents().catch(() => []),
@@ -170,6 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workdayEnd: z.string().optional(),
         meetingWindowsJson: z.any().optional(),
         deepWorkBlocksJson: z.any().optional(),
+        trelloBoardId: z.string().optional(),
       });
 
       const updates = schema.parse(req.body);
@@ -276,22 +308,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (syncWithTrello) {
         try {
-          const trelloCards = await fetchTrelloCards();
+          const settings = await storage.getUserSettings(user.id);
+          const boardId = settings?.trelloBoardId;
           
-          for (const card of trelloCards) {
-            const trelloTask = trelloCardToTask(card);
-            const trelloId = (trelloTask.metadataJson as any)?.trelloId;
+          if (boardId) {
+            const trelloCards = await fetchTrelloCards(boardId);
             
-            const existingTasks = await storage.getUserTasks(user.id);
-            const existing = existingTasks.find(t => 
-              (t.metadataJson as any)?.trelloId === trelloId
-            );
-            
-            if (!existing) {
-              await storage.createTask({
-                ...trelloTask,
-                userId: user.id,
-              });
+            for (const card of trelloCards) {
+              const trelloTask = trelloCardToTask(card);
+              const trelloId = (trelloTask.metadataJson as any)?.trelloId;
+              
+              const existingTasks = await storage.getUserTasks(user.id);
+              const existing = existingTasks.find(t => 
+                (t.metadataJson as any)?.trelloId === trelloId
+              );
+              
+              if (!existing) {
+                await storage.createTask({
+                  ...trelloTask,
+                  userId: user.id,
+                });
+              }
             }
           }
         } catch (trelloError) {

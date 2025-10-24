@@ -29,6 +29,7 @@ export const settings = pgTable("settings", {
   workdayEnd: text("workday_end").notNull().default("16:00"),
   meetingWindowsJson: jsonb("meeting_windows_json").default(sql`'[]'::jsonb`),
   deepWorkBlocksJson: jsonb("deep_work_blocks_json").default(sql`'[]'::jsonb`),
+  trelloBoardId: text("trello_board_id"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

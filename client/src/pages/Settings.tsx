@@ -3,9 +3,73 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2, Circle } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
+
+interface TrelloBoard {
+  id: string;
+  name: string;
+  desc: string;
+  url: string;
+}
+
+interface Settings {
+  workdayStart: string;
+  workdayEnd: string;
+  trelloBoardId: string | null;
+}
 
 export default function Settings() {
+  const { toast } = useToast();
+  const [selectedBoardId, setSelectedBoardId] = useState<string>("");
+  
+  const { data: boards } = useQuery<TrelloBoard[]>({
+    queryKey: ['/api/trello/boards'],
+  });
+
+  const { data: settings } = useQuery<Settings>({
+    queryKey: ['/api/settings'],
+  });
+
+  useEffect(() => {
+    if (settings?.trelloBoardId) {
+      setSelectedBoardId(settings.trelloBoardId);
+    }
+  }, [settings]);
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (data: { trelloBoardId: string }) => {
+      return apiRequest('/api/settings', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings'] });
+      toast({
+        title: "Settings updated",
+        description: "Your Trello board selection has been saved.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update settings.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveTrelloBoard = () => {
+    if (selectedBoardId) {
+      updateSettingsMutation.mutate({ trelloBoardId: selectedBoardId });
+    }
+  };
+
   const integrations = [
     {
       id: "gmail",
@@ -138,6 +202,41 @@ export default function Settings() {
           <div className="pt-4">
             <Button data-testid="button-save-preferences">
               Save Preferences
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-semibold">Trello Integration</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="trello-board">Active Board</Label>
+            <p className="text-sm text-muted-foreground">
+              Choose which Trello board to sync tasks from
+            </p>
+            <Select value={selectedBoardId} onValueChange={setSelectedBoardId}>
+              <SelectTrigger className="max-w-md" data-testid="select-trello-board">
+                <SelectValue placeholder="Select a board..." />
+              </SelectTrigger>
+              <SelectContent>
+                {boards?.map((board) => (
+                  <SelectItem key={board.id} value={board.id}>
+                    {board.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="pt-2">
+            <Button 
+              onClick={handleSaveTrelloBoard}
+              disabled={!selectedBoardId || updateSettingsMutation.isPending}
+              data-testid="button-save-trello-board"
+            >
+              {updateSettingsMutation.isPending ? "Saving..." : "Save Board Selection"}
             </Button>
           </div>
         </CardContent>
