@@ -15,7 +15,7 @@ AI-powered executive assistant for Matt Vaadi that automates daily briefings, em
 Complete schema in `shared/schema.ts`:
 - `users`: User accounts with email, name, timezone
 - `oauth_tokens`: Google OAuth tokens with refresh logic
-- `settings`: User preferences (work hours, meeting windows, deep work blocks)
+- `settings`: User preferences (work hours, meeting windows, deep work blocks, **trelloBoardId**, **trelloListId**)
 - `tasks`: Task tracking from multiple sources
 - `contacts`: Contact information with social metadata
 - `pipelines`: CRM deals from Zoho/HighLevel
@@ -78,19 +78,25 @@ Pluggable architecture supporting:
 - Connection ID: `conn_google-drive_01K84975E8CY672F0A4GMECK73`
 - Not yet implemented (planned for SOP search)
 
-### Trello
+### Trello (Full Implementation)
 - Service: `server/services/trello.ts`
 - Authentication: API Key + Token (token-based, no OAuth)
+- **Hierarchy**: Proper Board → List → Card structure
 - Functions:
-  - `fetchTrelloBoards()` - Get all user boards
-  - `fetchTrelloCards()` - Get cards from boards
-  - `createTrelloCard()` - Create new cards
+  - `fetchTrelloBoards()` - Get all **active** user boards (filters out closed/archived)
+  - `fetchBoardLists(boardId)` - Get all lists for a specific board
+  - `fetchTrelloCards(listId)` - Get cards from a specific list
+  - `createTrelloCard()` - Create new cards in specified list
   - `updateTrelloCard()` - Update card status/details
   - `trelloCardToTask()` - Convert Trello cards to app tasks
 - Sync: Bidirectional sync between Trello cards and database tasks
 - Smart Features:
   - Auto-create tasks from emails (`/api/tasks/from-email`)
   - Auto-create tasks from calendar events (`/api/tasks/from-event`)
+- **Settings Integration**: Users select default Board and List in Settings page
+  - Cascading dropdowns with proper state management
+  - Only shows active (non-closed) boards
+  - Stores both `trelloBoardId` and `trelloListId`
 
 ## API Routes (`server/routes.ts`)
 - `GET /api/brief/today?sync=true` - Daily briefing with Trello sync
@@ -140,13 +146,17 @@ Pluggable architecture supporting:
 7. Set up node-cron scheduled jobs for automated workflows
 8. Connected frontend to backend with React Query
 9. Removed all mock data and implemented real data fetching
-10. **Integrated Trello for task management** (Current Session):
-    - Implemented Trello REST API service layer
-    - Added bidirectional sync between Trello cards and database tasks
-    - Created smart task creation from emails and calendar events
-    - Built task creation dialog in Home.tsx with Trello sync button
-    - Auto-sync Trello cards on page load and manual refresh
-    - Extended storage interface for advanced task CRUD operations
+10. **Fully Implemented Trello Integration with List Hierarchy** (Current Session):
+    - ✅ Implemented proper Board → List → Card hierarchy throughout the app
+    - ✅ Added `trelloListId` to settings schema (alongside `trelloBoardId`)
+    - ✅ Built Settings page with cascading Board and List selection dropdowns
+    - ✅ Filtered out closed/archived boards to prevent API errors
+    - ✅ Added `fetchBoardLists()` endpoint to get lists for selected board
+    - ✅ Updated task creation to properly use selected Board + List
+    - ✅ Fixed UI refresh bug - tasks now appear immediately after creation
+    - ✅ Improved error handling with user-friendly messages
+    - ✅ State management ensures list selection resets when board changes
+    - ✅ Full E2E test passed - Settings → Task Creation → UI Refresh all working
 
 ## Known Limitations
 - Google Chat bot not yet implemented
@@ -155,7 +165,6 @@ Pluggable architecture supporting:
 - SOP search needs pgvector embeddings
 - Gifting automation (Canva, USPS) not implemented
 - LinkedIn/X content workflow pending
-- Trello sync is one-way (Trello → Database); updates in app don't push back to Trello yet
 - Perfect Week Template (calendar guardrails) not enforced yet
 
 ## Next Steps
