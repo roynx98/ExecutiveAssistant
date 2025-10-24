@@ -43,10 +43,7 @@ export default function Settings() {
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (data: { trelloBoardId: string }) => {
-      return apiRequest('/api/settings', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return apiRequest('POST', '/api/settings', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/settings'] });

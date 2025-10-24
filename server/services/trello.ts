@@ -189,7 +189,7 @@ export function trelloCardToTask(card: TrelloCard): Omit<Task, 'userId' | 'creat
       url: card.url,
       description: card.desc || '',
       labels: card.labels,
-    },
+    } as any,
   };
 }
 

@@ -51,8 +51,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               if (!existing) {
                 await storage.createTask({
-                  ...trelloTask,
                   userId: user.id,
+                  title: trelloTask.title,
+                  status: trelloTask.status,
+                  dueAt: trelloTask.dueAt,
+                  source: trelloTask.source,
+                  metadataJson: trelloTask.metadataJson as any,
                 });
               }
             }
@@ -325,8 +329,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               if (!existing) {
                 await storage.createTask({
-                  ...trelloTask,
                   userId: user.id,
+                  title: trelloTask.title,
+                  status: trelloTask.status,
+                  dueAt: trelloTask.dueAt,
+                  source: trelloTask.source,
+                  metadataJson: trelloTask.metadataJson as any,
                 });
               }
             }
@@ -404,9 +412,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const trelloTask = trelloCardToTask(card);
       const task = await storage.createTask({
-        ...trelloCardToTask(card),
         userId: user.id,
+        title: trelloTask.title,
+        status: trelloTask.status,
+        dueAt: trelloTask.dueAt,
+        source: trelloTask.source,
+        metadataJson: trelloTask.metadataJson as any,
       });
 
       res.json({ card, task });
@@ -485,9 +498,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const trelloTask = trelloCardToTask(card);
       const task = await storage.createTask({
-        ...trelloCardToTask(card),
         userId: user.id,
+        title: trelloTask.title,
+        status: trelloTask.status,
+        dueAt: trelloTask.dueAt,
+        source: trelloTask.source,
+        metadataJson: trelloTask.metadataJson as any,
       });
 
       res.json({ task, card });
@@ -534,9 +552,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const trelloTask = trelloCardToTask(card);
       const task = await storage.createTask({
-        ...trelloCardToTask(card),
         userId: user.id,
+        title: trelloTask.title,
+        status: trelloTask.status,
+        dueAt: trelloTask.dueAt,
+        source: trelloTask.source,
+        metadataJson: trelloTask.metadataJson as any,
       });
 
       res.json({ task, card });
