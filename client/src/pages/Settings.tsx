@@ -33,6 +33,7 @@ export default function Settings() {
   const { toast } = useToast();
   const [selectedBoardId, setSelectedBoardId] = useState<string>("");
   const [selectedListId, setSelectedListId] = useState<string>("");
+  const [previousBoardId, setPreviousBoardId] = useState<string>("");
   
   const { data: boardsData } = useQuery<{ boards: TrelloBoard[] }>({
     queryKey: ['/api/trello/boards'],
@@ -54,6 +55,7 @@ export default function Settings() {
   useEffect(() => {
     if (settings?.trelloBoardId) {
       setSelectedBoardId(settings.trelloBoardId);
+      setPreviousBoardId(settings.trelloBoardId);
     }
     if (settings?.trelloListId) {
       setSelectedListId(settings.trelloListId);
@@ -61,10 +63,12 @@ export default function Settings() {
   }, [settings]);
 
   useEffect(() => {
-    if (selectedBoardId) {
+    if (selectedBoardId && selectedBoardId !== previousBoardId) {
+      setSelectedListId("");
+      setPreviousBoardId(selectedBoardId);
       refetchLists();
     }
-  }, [selectedBoardId, refetchLists]);
+  }, [selectedBoardId, previousBoardId, refetchLists]);
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (data: { trelloBoardId: string; trelloListId: string }) => {
