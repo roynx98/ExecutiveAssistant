@@ -3,11 +3,26 @@ import { CalendarEvent } from "@/components/CalendarEvent";
 import { EmailThread } from "@/components/EmailThread";
 import { TaskItem } from "@/components/TaskItem";
 import { DealCard } from "@/components/DealCard";
-import { Calendar, Mail, CheckCircle, TrendingUp, Plus, RefreshCw } from "lucide-react";
+import {
+  Calendar,
+  Mail,
+  CheckCircle,
+  TrendingUp,
+  Plus,
+  RefreshCw,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,7 +48,7 @@ interface BriefData {
     preview: string;
     timestamp: string;
     labels: string[];
-    priority?: 'high' | 'normal' | 'low';
+    priority?: "high" | "normal" | "low";
     unread: boolean;
   }>;
   events: Array<{
@@ -43,8 +58,8 @@ interface BriefData {
     endTime: string;
     attendees?: number;
     location?: string;
-    type?: 'meeting' | 'deep-work' | 'buffer';
-    status?: 'confirmed' | 'tentative' | 'declined';
+    type?: "meeting" | "deep-work" | "buffer";
+    status?: "confirmed" | "tentative" | "declined";
   }>;
   tasks: Array<{
     id: string;
@@ -71,22 +86,26 @@ export default function Home() {
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskDue, setNewTaskDue] = useState("");
 
-  const { data: brief, isLoading, refetch } = useQuery<BriefData>({
-    queryKey: ['/api/brief/today?sync=true'],
+  const {
+    data: brief,
+    isLoading,
+    refetch,
+  } = useQuery<BriefData>({
+    queryKey: ["/api/brief/today?sync=true"],
   });
 
   const updateTaskMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const response = await fetch(`/api/tasks/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      if (!response.ok) throw new Error('Failed to update task');
+      if (!response.ok) throw new Error("Failed to update task");
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/brief/today'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brief/today"] });
       toast({
         title: "Task updated",
         description: "Task status has been updated successfully.",
@@ -95,17 +114,23 @@ export default function Home() {
   });
 
   const createTaskMutation = useMutation({
-    mutationFn: async (taskData: { name: string; desc?: string; due?: string }) => {
-      const response = await fetch('/api/trello/cards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+    mutationFn: async (taskData: {
+      name: string;
+      desc?: string;
+      due?: string;
+    }) => {
+      const response = await fetch("/api/trello/cards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(taskData),
       });
-      if (!response.ok) throw new Error('Failed to create task');
+      if (!response.ok) throw new Error("Failed to create task");
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/brief/today?sync=true'] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brief/today?sync=true"],
+      });
       setIsAddTaskOpen(false);
       setNewTaskTitle("");
       setNewTaskDescription("");
@@ -119,13 +144,17 @@ export default function Home() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create task",
+        description:
+          error instanceof Error ? error.message : "Failed to create task",
       });
     },
   });
 
   const handleToggleTask = (id: string, completed: boolean) => {
-    updateTaskMutation.mutate({ id, status: completed ? 'completed' : 'pending' });
+    updateTaskMutation.mutate({
+      id,
+      status: completed ? "completed" : "pending",
+    });
   };
 
   const handleCreateTask = () => {
@@ -161,7 +190,9 @@ export default function Home() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-semibold">Loading your daily brief...</h1>
+          <h1 className="text-3xl font-semibold">
+            Loading your daily brief...
+          </h1>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
@@ -180,9 +211,7 @@ export default function Home() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-semibold">
-            Good night, Matt
-          </h1>
+          <h1 className="text-3xl font-semibold">Good day, Matt</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {format(new Date(), "EEEE, MMMM d, yyyy")}
           </p>
@@ -196,21 +225,23 @@ export default function Home() {
         <BriefCard
           title="Meetings Today"
           value={brief.metrics.meetingsToday}
-          subtitle={`${brief.events.filter(e => e.status === 'confirmed').length} confirmed`}
+          subtitle={`${brief.events.filter((e) => e.status === "confirmed").length} confirmed`}
           icon={Calendar}
           variant="default"
         />
         <BriefCard
           title="Priority Emails"
           value={brief.metrics.priorityEmails}
-          subtitle={`${brief.emails.filter(e => e.unread).length} unread`}
+          subtitle={`${brief.emails.filter((e) => e.unread).length} unread`}
           icon={Mail}
           variant="warning"
         />
         <BriefCard
           title="Tasks Due"
           value={brief.metrics.tasksDue}
-          subtitle={brief.metrics.tasksDue > 0 ? 'Needs attention' : 'All clear'}
+          subtitle={
+            brief.metrics.tasksDue > 0 ? "Needs attention" : "All clear"
+          }
           icon={CheckCircle}
           variant="success"
         />
@@ -222,7 +253,11 @@ export default function Home() {
             <CardTitle className="text-xl font-semibold">
               Today's Schedule
             </CardTitle>
-            <Button variant="outline" size="sm" data-testid="button-view-calendar">
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="button-view-calendar"
+            >
               View Calendar
             </Button>
           </CardHeader>
@@ -250,16 +285,16 @@ export default function Home() {
               <CardTitle className="text-xl font-semibold">
                 Top Priority Tasks
               </CardTitle>
-              {brief.tasks.some(t => t.source === 'trello') && (
+              {brief.tasks.some((t) => t.source === "trello") && (
                 <Badge variant="secondary" className="text-xs">
                   Synced with Trello
                 </Badge>
               )}
             </div>
             <div className="flex gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleSyncTrello}
                 data-testid="button-sync-trello"
                 title="Sync with Trello"
@@ -268,7 +303,11 @@ export default function Home() {
               </Button>
               <Dialog open={isAddTaskOpen} onOpenChange={setIsAddTaskOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" data-testid="button-add-task">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="button-add-task"
+                  >
                     <Plus className="h-4 w-4 mr-1" />
                     Add Task
                   </Button>
@@ -277,7 +316,8 @@ export default function Home() {
                   <DialogHeader>
                     <DialogTitle>Create New Task</DialogTitle>
                     <DialogDescription>
-                      Create a new task in Trello. It will be synced automatically.
+                      Create a new task in Trello. It will be synced
+                      automatically.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
@@ -292,7 +332,9 @@ export default function Home() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="task-description">Description (optional)</Label>
+                      <Label htmlFor="task-description">
+                        Description (optional)
+                      </Label>
                       <Textarea
                         id="task-description"
                         placeholder="Enter task description"
@@ -325,7 +367,9 @@ export default function Home() {
                       disabled={createTaskMutation.isPending}
                       data-testid="button-create-task"
                     >
-                      {createTaskMutation.isPending ? "Creating..." : "Create Task"}
+                      {createTaskMutation.isPending
+                        ? "Creating..."
+                        : "Create Task"}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -339,7 +383,7 @@ export default function Home() {
                   key={task.id}
                   id={task.id}
                   title={task.title}
-                  completed={task.status === 'completed'}
+                  completed={task.status === "completed"}
                   dueDate={task.dueAt ? new Date(task.dueAt) : undefined}
                   source={task.source}
                   priority={task.metadataJson?.priority}
@@ -361,20 +405,26 @@ export default function Home() {
             <CardTitle className="text-xl font-semibold">
               Priority Emails
             </CardTitle>
-            <Button variant="outline" size="sm" data-testid="button-view-all-emails">
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="button-view-all-emails"
+            >
               View All
             </Button>
           </CardHeader>
           <CardContent className="p-0">
             {brief.emails.length > 0 ? (
-              brief.emails.slice(0, 3).map((email) => (
-                <EmailThread
-                  key={email.id}
-                  {...email}
-                  timestamp={new Date(email.timestamp)}
-                  onClick={() => console.log("Email clicked:", email.id)}
-                />
-              ))
+              brief.emails
+                .slice(0, 3)
+                .map((email) => (
+                  <EmailThread
+                    key={email.id}
+                    {...email}
+                    timestamp={new Date(email.timestamp)}
+                    onClick={() => console.log("Email clicked:", email.id)}
+                  />
+                ))
             ) : (
               <p className="text-muted-foreground text-center py-8 px-4">
                 No priority emails
@@ -389,16 +439,22 @@ export default function Home() {
               <TrendingUp className="h-5 w-5" />
               Active Deals
             </CardTitle>
-            <Button variant="outline" size="sm" data-testid="button-view-pipeline">
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="button-view-pipeline"
+            >
               View Pipeline
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             {brief.deals.length > 0 ? (
               brief.deals.map((deal) => {
-                const daysSinceUpdate = (Date.now() - new Date(deal.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+                const daysSinceUpdate =
+                  (Date.now() - new Date(deal.updatedAt).getTime()) /
+                  (1000 * 60 * 60 * 24);
                 const stale = daysSinceUpdate > 7;
-                
+
                 return (
                   <DealCard
                     key={deal.id}
