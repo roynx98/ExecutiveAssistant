@@ -61,22 +61,27 @@ Pluggable architecture supporting:
 
 ## Integrations
 
-### Gmail (Custom OAuth)
+### Google Services (Custom OAuth)
+All Google services use a unified custom OAuth flow instead of Replit connectors:
+- **OAuth Service**: `server/services/oauth.ts`
+- **Token Storage**: Database table `oauth_tokens` with automatic refresh
+- **Auth Flow**: `/api/oauth/authorize` → Google consent → `/api/oauth/callback`
+- **Environment Variables**: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`
+
+#### Gmail
 - Service: `server/services/google/gmail.ts`
-- OAuth: `server/services/oauth.ts`
 - Functions: `fetchRecentEmails()`, `sendEmail()`
 - Scopes: gmail.readonly, gmail.send, gmail.modify, gmail.labels
-- Implementation: Custom OAuth flow with tokens stored in database
 
-### Calendar (Custom OAuth)
+#### Google Calendar
 - Service: `server/services/google/calendar.ts`
 - Functions: `fetchTodayEvents()`, `isWithinWorkHours()`
-- Scopes: events (read/write), calendar access
+- Scopes: calendar, calendar.events (full read/write)
 - Work Hours: 8 AM-4 PM ET enforcement
 
-### Drive (Custom OAuth)
-- Connection ID: `conn_google-drive_01K84975E8CY672F0A4GMECK73`
+#### Google Drive (Planned)
 - Not yet implemented (planned for SOP search)
+- Will use same custom OAuth flow when implemented
 
 ### Trello (Full Implementation)
 - Service: `server/services/trello.ts`
@@ -178,7 +183,11 @@ Pluggable architecture supporting:
 ## Environment Requirements
 - Node.js 20+
 - PostgreSQL database (provided by Replit)
-- Google OAuth credentials (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET)
+- **Google OAuth Client** (User creates their own in Google Cloud Console):
+  - `GOOGLE_OAUTH_CLIENT_ID` - OAuth 2.0 Client ID
+  - `GOOGLE_OAUTH_CLIENT_SECRET` - OAuth 2.0 Client Secret
+  - Authorized redirect URI: `https://your-repl-url/api/oauth/callback`
+  - Required scopes: Gmail (read/send/modify/labels), Calendar (events read/write)
 - Trello API credentials (TRELLO_API_KEY, TRELLO_TOKEN)
 - LLM API keys: GEMINI_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY
 - SESSION_SECRET for Express sessions

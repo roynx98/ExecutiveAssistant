@@ -1,57 +1,46 @@
 import { google } from "googleapis";
+import { db } from '../../db';
+import { oauthTokens } from '../../../shared/schema';
+import { eq, and } from 'drizzle-orm';
+import { refreshAccessToken, getOAuth2Client } from '../oauth';
 
-let connectionSettings: any;
+async function getValidAccessToken(): Promise<string> {
+  const tokens = await db.select()
+    .from(oauthTokens)
+    .where(and(
+      eq(oauthTokens.provider, 'google')
+    ))
+    .limit(1);
 
-async function getAccessToken() {
-  if (
-    connectionSettings &&
-    connectionSettings.settings.expires_at &&
-    new Date(connectionSettings.settings.expires_at).getTime() > Date.now()
-  ) {
-    return connectionSettings.settings.access_token;
+  if (!tokens || tokens.length === 0) {
+    throw new Error('Google Calendar not connected. Please authorize at /api/oauth/authorize');
   }
 
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const token = tokens[0];
 
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? "repl " + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-      ? "depl " + process.env.WEB_REPL_RENEWAL
-      : null;
+  if (token.expiresAt && new Date(token.expiresAt) <= new Date()) {
+    console.log('Access token expired, refreshing...');
+    const newTokens = await refreshAccessToken(token.refreshToken!);
+    
+    await db.update(oauthTokens)
+      .set({
+        accessToken: newTokens.access_token!,
+        expiresAt: new Date(Date.now() + (newTokens.expiry_date || 3600000)),
+      })
+      .where(eq(oauthTokens.id, token.id));
 
-  if (!xReplitToken) {
-    throw new Error("X_REPLIT_TOKEN not found for repl/depl");
+    return newTokens.access_token!;
   }
 
-  connectionSettings = await fetch(
-    "https://" +
-      hostname +
-      "/api/v2/connection?include_secrets=true&connector_names=google-calendar",
-    {
-      headers: {
-        Accept: "application/json",
-        X_REPLIT_TOKEN: xReplitToken,
-      },
-    },
-  )
-    .then((res) => res.json())
-    .then((data) => data.items?.[0]);
-
-  const accessToken =
-    connectionSettings?.settings?.access_token ||
-    connectionSettings.settings?.oauth?.credentials?.access_token;
-  if (!connectionSettings || !accessToken) {
-    throw new Error("Google Calendar not connected");
-  }
-  return accessToken;
+  return token.accessToken;
 }
 
 export async function getUncachableGoogleCalendarClient() {
-  const accessToken = await getAccessToken();
+  const accessToken = await getValidAccessToken();
 
-  const oauth2Client = new google.auth.OAuth2();
+  const oauth2Client = getOAuth2Client();
   oauth2Client.setCredentials({
-    access_token: accessToken,
+    access_token: accessToken
   });
 
   return google.calendar({ version: "v3", auth: oauth2Client });

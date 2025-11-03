@@ -5,9 +5,21 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Loader2 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+
+interface CalendarEventData {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  attendees?: number;
+  location?: string;
+  type?: "meeting" | "deep-work" | "buffer";
+  status?: "confirmed" | "tentative" | "declined";
+}
 
 export default function CalendarPage() {
   const [workHoursEnabled, setWorkHoursEnabled] = useState(true);
@@ -16,44 +28,15 @@ export default function CalendarPage() {
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentDate, i));
 
-  const events = [
-    {
-      id: "1",
-      title: "Team Standup",
-      startTime: new Date(new Date().setHours(9, 0, 0, 0)),
-      endTime: new Date(new Date().setHours(9, 30, 0, 0)),
-      attendees: 8,
-      location: "Zoom",
-      type: "meeting" as const,
-      status: "confirmed" as const,
-    },
-    {
-      id: "2",
-      title: "Deep Work Block",
-      startTime: new Date(new Date().setHours(10, 0, 0, 0)),
-      endTime: new Date(new Date().setHours(12, 0, 0, 0)),
-      type: "deep-work" as const,
-      status: "confirmed" as const,
-    },
-    {
-      id: "3",
-      title: "Client Meeting - Acme Corp",
-      startTime: new Date(new Date().setHours(14, 0, 0, 0)),
-      endTime: new Date(new Date().setHours(15, 0, 0, 0)),
-      attendees: 5,
-      location: "Conference Room A",
-      type: "meeting" as const,
-      status: "confirmed" as const,
-    },
-    {
-      id: "4",
-      title: "Buffer Time",
-      startTime: new Date(new Date().setHours(15, 0, 0, 0)),
-      endTime: new Date(new Date().setHours(15, 30, 0, 0)),
-      type: "buffer" as const,
-      status: "confirmed" as const,
-    },
-  ];
+  const { data, isLoading, error } = useQuery<{ events: CalendarEventData[] }>({
+    queryKey: ['/api/calendar/today'],
+  });
+
+  const events = data?.events.map(event => ({
+    ...event,
+    startTime: new Date(event.startTime),
+    endTime: new Date(event.endTime),
+  })) || [];
 
   return (
     <div className="space-y-6">
@@ -90,9 +73,35 @@ export default function CalendarPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {events.map((event) => (
-                <CalendarEvent key={event.id} {...event} />
-              ))}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8" data-testid="loading-events">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : error ? (
+                <div className="text-center py-8 space-y-4" data-testid="error-events">
+                  <p className="text-sm text-destructive">
+                    Failed to load calendar events
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.href = '/api/oauth/authorize'}
+                    data-testid="button-connect-google"
+                  >
+                    Connect Google Calendar
+                  </Button>
+                </div>
+              ) : events.length === 0 ? (
+                <div className="text-center py-8" data-testid="empty-events">
+                  <p className="text-sm text-muted-foreground">
+                    No events scheduled for today
+                  </p>
+                </div>
+              ) : (
+                events.map((event) => (
+                  <CalendarEvent key={event.id} {...event} />
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

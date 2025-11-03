@@ -679,14 +679,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .container { text-align: center; max-width: 500px; padding: 2rem; }
               h1 { color: #60a5fa; margin-bottom: 1rem; }
               p { color: #94a3b8; line-height: 1.6; }
+              ul { text-align: left; margin: 1rem auto; max-width: 300px; }
               button { margin-top: 2rem; padding: 0.75rem 2rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-size: 1rem; }
               button:hover { background: #2563eb; }
             </style>
           </head>
           <body>
             <div class="container">
-              <h1>✓ Gmail Connected Successfully!</h1>
-              <p>Your Gmail account has been authorized with full API access. You can now close this window and return to the app.</p>
+              <h1>✓ Google Services Connected!</h1>
+              <p>Your Google account has been authorized with access to:</p>
+              <ul>
+                <li>Gmail (read, send, modify, labels)</li>
+                <li>Google Calendar (events, read/write)</li>
+              </ul>
+              <p>You can now close this window and return to the app.</p>
               <button onclick="window.close()">Close Window</button>
             </div>
           </body>
