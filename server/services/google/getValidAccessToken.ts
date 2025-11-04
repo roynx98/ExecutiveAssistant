@@ -17,7 +17,8 @@ export async function getValidAccessToken(): Promise<string> {
 
   const token = tokens[0];
 
-  if (token.expiresAt && new Date(token.expiresAt) <= new Date()) {
+  const timesSinceCreation = new Date().getTime() - new Date(token.createdAt).getTime();
+  if (timesSinceCreation >= 60 * 60 * 1000) {
     console.log('Access token expired, refreshing...');
     const newTokens = await refreshAccessToken(token.refreshToken!);
     
@@ -25,6 +26,7 @@ export async function getValidAccessToken(): Promise<string> {
       .set({
         accessToken: newTokens.access_token!,
         expiresAt: new Date(Date.now() + (newTokens.expiry_date || 3600000)),
+        createdAt: new Date(Date.now())
       })
       .where(eq(oauthTokens.id, token.id));
 
