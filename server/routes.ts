@@ -104,7 +104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         emails: priorityEmails,
         events,
-        tasks: pendingTasks.slice(0, 5),
+        tasks: pendingTasks.reverse().slice(0, 5),
         deals: deals.slice(0, 4),
       });
     } catch (error) {
