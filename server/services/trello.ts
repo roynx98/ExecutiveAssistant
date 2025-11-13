@@ -195,8 +195,11 @@ export async function deleteTrelloCard(cardId: string): Promise<void> {
 }
 
 // Convert Trello card to our Task format (excluding id to avoid conflicts)
-export function trelloCardToTask(card: TrelloCard): Omit<Task, 'userId' | 'createdAt' | 'id'> {
+export function trelloCardToTask(card: TrelloCard): Task {
   return {
+    id: card.id,
+    userId: '',
+    createdAt: new Date(), 
     title: card.name,
     dueAt: card.due ? new Date(card.due) : null,
     status: card.dueComplete ? 'completed' : 'pending',

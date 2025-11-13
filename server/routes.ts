@@ -15,6 +15,7 @@ import {
   fetchBoardLists,
 } from "./services/trello";
 import { z } from "zod";
+import { Task } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/brief/today", async (req, res) => {
@@ -31,6 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const syncWithTrello = req.query.sync === "true";
+      let tasks: Task[] = [];
       if (syncWithTrello) {
         try {
           const settings = await storage.getUserSettings(user.id);
@@ -42,23 +44,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             for (const card of trelloCards) {
               const trelloTask = trelloCardToTask(card);
-              const trelloId = (trelloTask.metadataJson as any)?.trelloId;
-
-              const existingTasks = await storage.getUserTasks(user.id);
-              const existing = existingTasks.find(
-                (t) => (t.metadataJson as any)?.trelloId === trelloId
-              );
-
-              if (!existing) {
-                await storage.createTask({
-                  userId: user.id,
-                  title: trelloTask.title,
-                  status: trelloTask.status,
-                  dueAt: trelloTask.dueAt,
-                  source: trelloTask.source,
-                  metadataJson: trelloTask.metadataJson as any,
-                });
-              }
+              tasks.push(trelloTask);
             }
           }
         } catch (trelloError) {
@@ -66,7 +52,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const [emails, events, tasks, deals] = await Promise.all([
+      const [emails, events, deals] = await Promise.all([
         fetchRecentEmails(10).catch((error) => {
           console.error("Failed to fetch recent emails:", error);
           return [];
@@ -75,7 +61,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Failed to fetch today's events:", error);
           return [];
         }),
-        storage.getUserTasks(user.id),
         storage.getActiveDeals(user.id),
       ]);
 
