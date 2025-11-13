@@ -1,10 +1,19 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb, boolean } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  timestamp,
+  integer,
+  jsonb,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   timezone: text("timezone").notNull().default("America/New_York"),
@@ -12,8 +21,12 @@ export const users = pgTable("users", {
 });
 
 export const oauthTokens = pgTable("oauth_tokens", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   provider: text("provider").notNull(),
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token"),
@@ -23,8 +36,13 @@ export const oauthTokens = pgTable("oauth_tokens", {
 });
 
 export const settings = pgTable("settings", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" })
+    .unique(),
   workdayStart: text("workday_start").notNull().default("08:00"),
   workdayEnd: text("workday_end").notNull().default("16:00"),
   meetingWindowsJson: jsonb("meeting_windows_json").default(sql`'[]'::jsonb`),
@@ -35,8 +53,12 @@ export const settings = pgTable("settings", {
 });
 
 export const emailRules = pgTable("email_rules", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   ruleName: text("rule_name").notNull(),
   matcherJson: jsonb("matcher_json").notNull(),
   actionsJson: jsonb("actions_json").notNull(),
@@ -44,8 +66,12 @@ export const emailRules = pgTable("email_rules", {
 });
 
 export const tasks = pgTable("tasks", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   status: text("status").notNull().default("pending"),
   dueAt: timestamp("due_at"),
@@ -55,8 +81,12 @@ export const tasks = pgTable("tasks", {
 });
 
 export const contacts = pgTable("contacts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   email: text("email").notNull(),
   name: text("name").notNull(),
   source: text("source"),
@@ -65,8 +95,12 @@ export const contacts = pgTable("contacts", {
 });
 
 export const pipelines = pgTable("pipelines", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   provider: text("provider").notNull(),
   dealId: text("deal_id").notNull(),
   stage: text("stage").notNull(),
@@ -78,8 +112,12 @@ export const pipelines = pgTable("pipelines", {
 });
 
 export const posts = pgTable("posts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   network: text("network").notNull(),
   status: text("status").notNull().default("draft"),
   content: text("content").notNull(),
@@ -88,8 +126,12 @@ export const posts = pgTable("posts", {
 });
 
 export const sops = pgTable("sops", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   url: text("url").notNull(),
   type: text("type").notNull(),
@@ -98,8 +140,12 @@ export const sops = pgTable("sops", {
 });
 
 export const eventsCache = pgTable("events_cache", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   source: text("source").notNull(),
   externalId: text("external_id").notNull(),
   startAt: timestamp("start_at").notNull(),
@@ -108,9 +154,25 @@ export const eventsCache = pgTable("events_cache", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const emailPriorityCache = pgTable("email_priority_cache", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  emailId: text("email_id").notNull().unique(),
+  priority: text("priority").notNull(),
+  analyzedAt: timestamp("analyzed_at").notNull().defaultNow(),
+});
+
 export const gifts = pgTable("gifts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   person: text("person").notNull(),
   occasion: text("occasion").notNull(),
   dueAt: timestamp("due_at").notNull(),
@@ -156,6 +218,13 @@ export const insertEventSchema = createInsertSchema(eventsCache).omit({
   createdAt: true,
 });
 
+export const insertEmailPriorityCacheSchema = createInsertSchema(
+  emailPriorityCache
+).omit({
+  id: true,
+  analyzedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -177,3 +246,8 @@ export type InsertPipeline = z.infer<typeof insertPipelineSchema>;
 
 export type EventCache = typeof eventsCache.$inferSelect;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
+
+export type EmailPriorityCache = typeof emailPriorityCache.$inferSelect;
+export type InsertEmailPriorityCache = z.infer<
+  typeof insertEmailPriorityCacheSchema
+>;

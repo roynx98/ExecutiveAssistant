@@ -2,10 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { fetchRecentEmails, sendEmail } from "./services/google/gmail";
-import {
-  fetchTodayEvents,
-  isWithinWorkHours,
-} from "./services/google/calendar";
+import { fetchTodayEvents } from "./services/google/calendar";
 import { generateEmailDraft } from "./services/llm";
 import { getAuthUrl, getTokensFromCode } from "./services/oauth";
 import {
@@ -13,7 +10,6 @@ import {
   fetchTrelloCards,
   createTrelloCard,
   updateTrelloCard,
-  deleteTrelloCard,
   trelloCardToTask,
   getDefaultListId,
   fetchBoardLists,
@@ -50,7 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               const existingTasks = await storage.getUserTasks(user.id);
               const existing = existingTasks.find(
-                (t) => (t.metadataJson as any)?.trelloId === trelloId,
+                (t) => (t.metadataJson as any)?.trelloId === trelloId
               );
 
               if (!existing) {
@@ -344,7 +340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               const existingTasks = await storage.getUserTasks(user.id);
               const existing = existingTasks.find(
-                (t) => (t.metadataJson as any)?.trelloId === trelloId,
+                (t) => (t.metadataJson as any)?.trelloId === trelloId
               );
 
               if (!existing) {
@@ -429,7 +425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!targetListId) {
         throw new Error(
-          "No Trello list configured. Please select a board and list in Settings.",
+          "No Trello list configured. Please select a board and list in Settings."
         );
       }
 
@@ -437,7 +433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "[DEBUG] Creating Trello card with listId:",
         targetListId,
         "name:",
-        name,
+        name
       );
 
       const card = await createTrelloCard({
@@ -578,7 +574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const { eventId, eventTitle, startTime, attendees } = schema.parse(
-        req.body,
+        req.body
       );
 
       const taskTitle = `Prepare for: ${eventTitle}`;
@@ -588,7 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : `Event ID: ${eventId}`;
 
       const dueDate = new Date(
-        new Date(startTime).getTime() - 24 * 60 * 60 * 1000,
+        new Date(startTime).getTime() - 24 * 60 * 60 * 1000
       );
 
       const card = await createTrelloCard({
@@ -629,7 +625,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/oauth/authorize", (req, res) => {
     try {
-      const redirectUri = `${req.protocol}://${req.get("host")}/api/oauth/callback`;
+      const redirectUri = `${req.protocol}://${req.get(
+        "host"
+      )}/api/oauth/callback`;
       const authUrl = getAuthUrl(redirectUri);
       res.redirect(authUrl);
     } catch (error) {
@@ -649,7 +647,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Authorization code missing" });
       }
 
-      const redirectUri = `${req.protocol}://${req.get("host")}/api/oauth/callback`;
+      const redirectUri = `${req.protocol}://${req.get(
+        "host"
+      )}/api/oauth/callback`;
       const tokens = await getTokensFromCode(code, redirectUri);
 
       let user = await storage.getUserByEmail("matt@example.com");
@@ -714,7 +714,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <body>
             <div class="container">
               <h1>✗ Authorization Failed</h1>
-              <p>${error instanceof Error ? error.message : "Unknown error occurred"}</p>
+              <p>${
+                error instanceof Error
+                  ? error.message
+                  : "Unknown error occurred"
+              }</p>
             </div>
           </body>
         </html>
