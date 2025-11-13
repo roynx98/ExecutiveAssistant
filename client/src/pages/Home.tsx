@@ -29,7 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BriefData {
@@ -93,6 +93,14 @@ export default function Home() {
   } = useQuery<BriefData>({
     queryKey: ["/api/brief/today?sync=true"],
   });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetch();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [refetch]);
 
   const updateTaskMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
